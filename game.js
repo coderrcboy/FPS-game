@@ -1,322 +1,265 @@
-// game.js
-
+// Get elements from HTML
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 const menu = document.getElementById('menu');
 const hud = document.getElementById('hud');
-const scoreEl = document.getElementById('score');
-const resultEl = document.getElementById('result');
-const btnBack = document.getElementById('btn-back');
-const btnPause = document.getElementById('btn-pause');
+const pauseScreen = document.getElementById('pause-screen');
 
-const pauseOverlay = document.getElementById('pause-overlay');
+const hpText = document.getElementById('hp-text');
+const resultText = document.getElementById('result-text');
+
+const btnEasy = document.getElementById('btn-easy');
+const btnMedium = document.getElementById('btn-medium');
+const btnHard = document.getElementById('btn-hard');
+
+const btnPause = document.getElementById('btn-pause');
+const btnBack = document.getElementById('btn-back');
 const btnResume = document.getElementById('btn-resume');
 const btnQuit = document.getElementById('btn-quit');
 
-const btnEasy = document.getElementById('btn-start-easy');
-const btnMedium = document.getElementById('btn-start-medium');
-const btnHard = document.getElementById('btn-start-hard');
-
+// Game state
 let gameRunning = false;
 let paused = false;
-let botDifficulty = 'medium';
+let difficulty = 'medium';
 
 // Input
 const keys = {};
-const mouse = { x: 0, y: 0, down: false };
+const mouse = { x: 0, y: 0 };
 
-// Config
-const squareSize = 24; // size of each "square" in the 3-block character
+// Sizes
+const squareSize = 24;
 const bulletSize = 6;
-const baseY = canvas.height - 40; // floor line
+const floorY = canvas.height - 40;
 
-// Characters: each is 3 squares: [head, body1, body2] from top to bottom
-// We'll store top-left of the whole stack, and derive squares.
-
+// Player
 const player = {
   x: 100,
-  y: baseY - squareSize * 3, // top of stack
+  y: floorY - squareSize * 3,
   w: squareSize,
   h: squareSize * 3,
   speed: 5,
   color: '#33ccff',
-  hpHead: 100,
-  hpBody1: 100,
-  hpBody2: 100,
-  wins: 0
+  hp: 200
 };
 
+// Bot
 const bot = {
   x: canvas.width - 124,
-  y: baseY - squareSize * 3,
+  y: floorY - squareSize * 3,
   w: squareSize,
   h: squareSize * 3,
   speed: 3,
   color: '#ff3366',
-  hpHead: 100,
-  hpBody1: 100,
-  hpBody2: 100,
-  wins: 0,
-  shootCooldown: 0,
+  hp: 200,
+  shootWait: 0,
   shootDelay: 40,
-  reactionFrames: 20
+  thinkWait: 0,
+  thinkDelay: 20,
+  targetY: 0
 };
 
-let bullets = []; // {x,y,vx,vy,owner:'player'|'bot'}
+// Bullets
+let bullets = [];
 
-let matchOver = false;
-let matchWinnerText = '';
+// Player shoot cooldown
+let playerShootWait = 0;
+const playerShootDelay = 18;
 
 // ----------------------
-// UI wiring
+// Button clicks
 // ----------------------
 
-btnEasy.addEventListener('click', () => startGame('easy'));
-btnMedium.addEventListener('click', () => startGame('medium'));
-btnHard.addEventListener('click', () => startGame('hard'));
+btnEasy.addEventListener('click', function() {
+  startGame('easy');
+});
 
-btnBack.addEventListener('click', () => {
+btnMedium.addEventListener('click', function() {
+  startGame('medium');
+});
+
+btnHard.addEventListener('click', function() {
+  startGame('hard');
+});
+
+btnBack.addEventListener('click', function() {
   gameRunning = false;
-  paused = false;
-  pauseOverlay.style.display = 'none';
+  menu.style.display = 'block';
   canvas.style.display = 'none';
   hud.style.display = 'none';
-  menu.style.display = 'block';
-  resultEl.textContent = '';
+  pauseScreen.style.display = 'none';
+  resultText.textContent = '';
 });
 
-btnPause.addEventListener('click', () => {
+btnPause.addEventListener('click', function() {
   if (!gameRunning) return;
-  togglePause();
+  paused = !paused;
+  if (paused) {
+    pauseScreen.style.display = 'flex';
+  } else {
+    pauseScreen.style.display = 'none';
+  }
 });
 
-btnResume.addEventListener('click', () => {
-  if (!gameRunning) return;
-  togglePause();
-});
-
-btnQuit.addEventListener('click', () => {
-  gameRunning = false;
+btnResume.addEventListener('click', function() {
   paused = false;
-  pauseOverlay.style.display = 'none';
+  pauseScreen.style.display = 'none';
+});
+
+btnQuit.addEventListener('click', function() {
+  gameRunning = false;
+  menu.style.display = 'block';
   canvas.style.display = 'none';
   hud.style.display = 'none';
-  menu.style.display = 'block';
-  resultEl.textContent = '';
+  pauseScreen.style.display = 'none';
+  resultText.textContent = '';
 });
 
-// Pause with P key
-window.addEventListener('keydown', (e) => {
+// ----------------------
+// Start game
+// ----------------------
+
+function startGame(diff) {
+  difficulty = diff;
+
+  // Bot settings
+  if (difficulty === 'easy') {
+    bot.speed = 2.2;
+    bot.shootDelay = 55;
+    bot.thinkDelay = 35;
+  } else if (difficulty === 'medium') {
+    bot.speed = 3.2;
+    bot.shootDelay = 35;
+    bot.thinkDelay = 22;
+  } else if (difficulty === 'hard') {
+    bot.speed = 4.2;
+    bot.shootDelay = 22;
+    bot.thinkDelay = 10;
+  }
+
+  // Reset HP
+  player.hp = 200;
+  bot.hp = 200;
+
+  // Reset positions
+  player.x = 100;
+  player.y = floorY - squareSize * 3;
+  bot.x = canvas.width - 124;
+  bot.y = floorY - squareSize * 3;
+
+  bullets = [];
+  playerShootWait = 0;
+  bot.shootWait = 0;
+
+  // Show game
+  menu.style.display = 'none';
+  canvas.style.display = 'block';
+  hud.style.display = 'flex';
+  pauseScreen.style.display = 'none';
+
+  gameRunning = true;
+  paused = false;
+  updateHpText();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ----------------------
+// Keys and mouse
+// ----------------------
+
+window.addEventListener('keydown', function(e) {
   const key = e.key.toLowerCase();
   keys[key] = true;
 
   if (key === 'p' && gameRunning) {
-    togglePause();
-  }
-
-  if (key === 'arrowup' || key === 'arrowdown') {
-    // prevent page scroll
-    e.preventDefault();
+    paused = !paused;
+    if (paused) {
+      pauseScreen.style.display = 'flex';
+    } else {
+      pauseScreen.style.display = 'none';
+    }
   }
 
   if (key === ' ' && gameRunning && !paused) {
-    tryShootPlayer();
+    playerShoot();
+  }
+
+  if (key === 'arrowup' || key === 'arrowdown') {
+    e.preventDefault();
   }
 });
 
-window.addEventListener('keyup', (e) => {
+window.addEventListener('keyup', function(e) {
   keys[e.key.toLowerCase()] = false;
 });
 
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('mousemove', function(e) {
   const rect = canvas.getBoundingClientRect();
   mouse.x = e.clientX - rect.left;
   mouse.y = e.clientY - rect.top;
 });
 
-canvas.addEventListener('mousedown', () => {
-  mouse.down = true;
-  if (gameRunning && !paused) tryShootPlayer();
-});
-
-canvas.addEventListener('mouseup', () => {
-  mouse.down = false;
-});
-
-// ----------------------
-// Game control
-// ----------------------
-
-function togglePause() {
-  paused = !paused;
-  pauseOverlay.style.display = paused ? 'flex' : 'none';
-}
-
-function startGame(difficulty) {
-  botDifficulty = difficulty;
-  configureBot();
-  menu.style.display = 'none';
-  canvas.style.display = 'block';
-  hud.style.display = 'flex';
-  pauseOverlay.style.display = 'none';
-  gameRunning = true;
-  paused = false;
-
-  player.wins = 0;
-  bot.wins = 0;
-  startMatch();
-  requestAnimationFrame(loop);
-}
-
-function configureBot() {
-  switch (botDifficulty) {
-    case 'easy':
-      bot.speed = 2.2;
-      bot.shootDelay = 55;
-      bot.reactionFrames = 35;
-      break;
-    case 'medium':
-      bot.speed = 3.2;
-      bot.shootDelay = 35;
-      bot.reactionFrames = 22;
-      break;
-    case 'hard':
-      bot.speed = 4.2;
-      bot.shootDelay = 22;
-      bot.reactionFrames = 10;
-      break;
+canvas.addEventListener('mousedown', function() {
+  if (gameRunning && !paused) {
+    playerShoot();
   }
-}
-
-function startMatch() {
-  resetCharacterHP(player);
-  resetCharacterHP(bot);
-  player.x = 100;
-  bot.x = canvas.width - 124;
-  player.y = baseY - squareSize * 3;
-  bot.y = baseY - squareSize * 3;
-  bullets = [];
-  matchOver = false;
-  matchWinnerText = '';
-  updateScore();
-}
-
-function resetCharacterHP(char) {
-  char.hpHead = 100;
-  char.hpBody1 = 100;
-  char.hpBody2 = 100;
-}
-
-function updateScore() {
-  // Show HP instead of wins; wins can be shown when match ends
-  scoreEl.textContent =
-    `You H:${Math.max(0, player.hpHead)} B1:${Math.max(0, player.hpBody1)} B2:${Math.max(0, player.hpBody2)} | ` +
-    `Bot H:${Math.max(0, bot.hpHead)} B1:${Math.max(0, bot.hpBody1)} B2:${Math.max(0, bot.hpBody2)}`;
-}
-
-function endMatch(winner) {
-  matchOver = true;
-  if (winner === 'player') {
-    player.wins++;
-    matchWinnerText = 'YOU WIN THE MATCH!';
-  } else if (winner === 'bot') {
-    bot.wins++;
-    matchWinnerText = 'BOT WINS THE MATCH!';
-  } else {
-    matchWinnerText = 'DRAW!';
-  }
-
-  resultEl.textContent = matchWinnerText + ` (You ${player.wins} - ${bot.wins} Bot)`;
-
-  // Show result and go back to menu after delay
-  setTimeout(() => {
-    gameRunning = false;
-    paused = false;
-    pauseOverlay.style.display = 'none';
-    canvas.style.display = 'none';
-    hud.style.display = 'none';
-    menu.style.display = 'block';
-  }, 2000);
-}
-
-function isCharacterDead(char) {
-  return char.hpHead <= 0 && char.hpBody1 <= 0 && char.hpBody2 <= 0;
-}
+});
 
 // ----------------------
 // Shooting
 // ----------------------
 
-let playerShootCooldown = 0;
-const playerShootDelay = 18;
+function playerShoot() {
+  if (playerShootWait > 0) return;
 
-function tryShootPlayer() {
-  if (!gameRunning || paused || matchOver) return;
-  if (playerShootCooldown > 0) return;
+  const headH = player.h / 3;
+  const cx = player.x + player.w / 2;
+  const cy = player.y + headH / 2;
 
-  // Shoot from head square center
-  const head = getHeadSquare(player);
-  const cx = head.x + head.w / 2;
-  const cy = head.y + head.h / 2;
   const angle = Math.atan2(mouse.y - cy, mouse.x - cx);
-
   const speed = 9;
+
   bullets.push({
     x: cx,
     y: cy,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
-    owner: 'player'
+    from: 'player'
   });
 
-  playerShootCooldown = playerShootDelay;
+  playerShootWait = playerShootDelay;
 }
 
 function botShoot() {
-  if (bot.shootCooldown > 0) return;
+  if (bot.shootWait > 0) return;
 
-  const head = getHeadSquare(bot);
-  const cx = head.x + head.w / 2;
-  const cy = head.y + head.h / 2;
+  const headH = bot.h / 3;
+  const cx = bot.x + bot.w / 2;
+  const cy = bot.y + headH / 2;
 
-  // Aim at player's head
-  const pHead = getHeadSquare(player);
-  const px = pHead.x + pHead.w / 2;
-  const py = pHead.y + pHead.h / 2;
+  const pHeadH = player.h / 3;
+  const px = player.x + player.w / 2;
+  const py = player.y + pHeadH / 2;
 
   const angle = Math.atan2(py - cy, px - cx);
-  const inaccuracy = (botDifficulty === 'easy' ? 0.25 : botDifficulty === 'medium' ? 0.12 : 0.05);
-  const finalAngle = angle + (Math.random() - 0.5) * inaccuracy;
 
+  let error = 0.1;
+  if (difficulty === 'easy') error = 0.25;
+  if (difficulty === 'hard') error = 0.05;
+
+  const finalAngle = angle + (Math.random() - 0.5) * error;
   const speed = 8;
+
   bullets.push({
     x: cx,
     y: cy,
     vx: Math.cos(finalAngle) * speed,
     vy: Math.sin(finalAngle) * speed,
-    owner: 'bot'
+    from: 'bot'
   });
 
-  bot.shootCooldown = bot.shootDelay;
-}
-
-// ----------------------
-// Helpers: squares
-// ----------------------
-
-function getHeadSquare(char) {
-  return { x: char.x, y: char.y, w: char.w, h: char.h / 3 };
-}
-function getBody1Square(char) {
-  return { x: char.x, y: char.y + char.h / 3, w: char.w, h: char.h / 3 };
-}
-function getBody2Square(char) {
-  return { x: char.x, y: char.y + (char.h / 3) * 2, w: char.w, h: char.h / 3 };
-}
-
-function getSquares(char) {
-  return [getHeadSquare(char), getBody1Square(char), getBody2Square(char)];
+  bot.shootWait = bot.shootDelay;
 }
 
 // ----------------------
@@ -326,20 +269,20 @@ function getSquares(char) {
 function update() {
   if (!gameRunning || paused) return;
 
-  // Player movement: Up/Down arrows
+  // Player move
   if (keys['arrowup']) player.y -= player.speed;
   if (keys['arrowdown']) player.y += player.speed;
 
-  // Clamp player to floor/ceiling
+  // Keep player on screen
   const minY = 20;
-  const maxY = baseY - player.h;
+  const maxY = floorY - player.h;
   if (player.y < minY) player.y = minY;
   if (player.y > maxY) player.y = maxY;
 
   // Player shoot cooldown
-  if (playerShootCooldown > 0) playerShootCooldown--;
+  if (playerShootWait > 0) playerShootWait--;
 
-  // Bot AI
+  // Bot
   updateBot();
 
   // Bullets
@@ -348,63 +291,136 @@ function update() {
     b.x += b.vx;
     b.y += b.vy;
 
-    // Remove if out of bounds
+    // Off screen
     if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
       bullets.splice(i, 1);
       continue;
     }
 
-    // Check collision with player squares
-    if (b.owner === 'bot') {
-      const squares = getSquares(player);
-      let hit = false;
-      squares.forEach((sq, idx) => {
-        if (hit) return;
-        if (rectCircleCollide(sq, b)) {
-          bullets.splice(i, 1);
-          hit = true;
-          // Apply damage based on which square
-          if (idx === 0) player.hpHead -= 25;
-          else if (idx === 1) player.hpBody1 -= 10;
-          else if (idx === 2) player.hpBody2 -= 10;
-
-          if (isCharacterDead(player)) {
-            endMatch('bot');
-          }
-          updateScore();
-        }
-      });
-      if (hit) return;
+    // Hit player?
+    if (b.from === 'bot') {
+      if (checkHitPlayer(b)) {
+        bullets.splice(i, 1);
+        continue;
+      }
     }
 
-    // Check collision with bot squares
-    if (b.owner === 'player') {
-      const squares = getSquares(bot);
-      let hit = false;
-      squares.forEach((sq, idx) => {
-        if (hit) return;
-        if (rectCircleCollide(sq, b)) {
-          bullets.splice(i, 1);
-          hit = true;
-          if (idx === 0) bot.hpHead -= 25;
-          else if (idx === 1) bot.hpBody1 -= 10;
-          else if (idx === 2) bot.hpBody2 -= 10;
-
-          if (isCharacterDead(bot)) {
-            endMatch('player');
-          }
-          updateScore();
-        }
-      });
-      if (hit) return;
+    // Hit bot?
+    if (b.from === 'player') {
+      if (checkHitBot(b)) {
+        bullets.splice(i, 1);
+        continue;
+      }
     }
   }
 
-  // Bot cooldowns
-  if (bot.shootCooldown > 0) bot.shootCooldown--;
+  // Bot shoot cooldown
+  if (bot.shootWait > 0) bot.shootWait--;
 }
 
-function rectCircleCollide(rect, circle) {
+// ----------------------
+// Bot logic
+// ----------------------
+
+function updateBot() {
+  if (bot.thinkWait <= 0) {
+    bot.targetY = player.y + (Math.random() - 0.5) * 40;
+    bot.thinkWait = bot.thinkDelay;
+  } else {
+    bot.thinkWait--;
+  }
+
+  const botCenter = bot.y + bot.h / 2;
+  if (botCenter < bot.targetY - 10) {
+    bot.y += bot.speed;
+  } else if (botCenter > bot.targetY + 10) {
+    bot.y -= bot.speed;
+  }
+
+  const minY = 20;
+  const maxY = floorY - bot.h;
+  if (bot.y < minY) bot.y = minY;
+  if (bot.y > maxY) bot.y = maxY;
+
+  const headH = bot.h / 3;
+  const cx = bot.x + bot.w / 2;
+  const cy = bot.y + headH / 2;
+
+  const pHeadH = player.h / 3;
+  const px = player.x + player.w / 2;
+  const py = player.y + pHeadH / 2;
+
+  const dx = px - cx;
+  const dy = py - cy;
+
+  if (dx < -20 && Math.abs(dy) < 120) {
+    botShoot();
+  }
+}
+
+// ----------------------
+// Hit checking
+// ----------------------
+
+function checkHitPlayer(bullet) {
+  const headH = player.h / 3;
+
+  const head = { x: player.x, y: player.y, w: player.w, h: headH };
+  const body1 = { x: player.x, y: player.y + headH, w: player.w, h: headH };
+  const body2 = { x: player.x, y: player.y + headH * 2, w: player.w, h: headH };
+
+  if (rectCircleHit(head, bullet)) {
+    player.hp -= 25;
+    updateHpText();
+    checkDeath();
+    return true;
+  }
+  if (rectCircleHit(body1, bullet)) {
+    player.hp -= 10;
+    updateHpText();
+    checkDeath();
+    return true;
+  }
+  if (rectCircleHit(body2, bullet)) {
+    player.hp -= 10;
+    updateHpText();
+    checkDeath();
+    return true;
+  }
+
+  return false;
+}
+
+function checkHitBot(bullet) {
+  const headH = bot.h / 3;
+
+  const head = { x: bot.x, y: bot.y, w: bot.w, h: headH };
+  const body1 = { x: bot.x, y: bot.y + headH, w: bot.w, h: headH };
+  const body2 = { x: bot.x, y: bot.y + headH * 2, w: bot.w, h: headH };
+
+  if (rectCircleHit(head, bullet)) {
+    bot.hp -= 25;
+    updateHpText();
+    checkDeath();
+    return true;
+  }
+  if (rectCircleHit(body1, bullet)) {
+    bot.hp -= 10;
+    updateHpText();
+    checkDeath();
+    return true;
+  }
+  if (rectCircleHit(body2, bullet)) {
+    bot.hp -= 10;
+    updateHpText();
+    checkDeath();
+    return true;
+  }
+
+  return false;
+}
+
+function rectCircleHit(rect, circle) {
   const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
   const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
   const dx = circle.x - closestX;
@@ -412,118 +428,78 @@ function rectCircleCollide(rect, circle) {
   return (dx * dx + dy * dy) <= (bulletSize * bulletSize);
 }
 
-// ----------------------
-// Bot AI
-// ----------------------
-
-let botThinkCooldown = 0;
-let botTargetY = 0;
-
-function updateBot() {
-  if (matchOver) return;
-
-  const bHead = getHeadSquare(bot);
-  const pHead = getHeadSquare(player);
-  const cx = bHead.x + bHead.w / 2;
-  const cy = bHead.y + bHead.h / 2;
-  const px = pHead.x + pHead.w / 2;
-  const py = pHead.y + pHead.h / 2;
-
-  // Movement: move vertically to align with player with some delay
-  if (botThinkCooldown <= 0) {
-    botTargetY = player.y + (Math.random() - 0.5) * 40;
-    botThinkCooldown = bot.reactionFrames;
-  } else {
-    botThinkCooldown--;
+function checkDeath() {
+  if (player.hp <= 0) {
+    endGame('Bot wins!');
+  } else if (bot.hp <= 0) {
+    endGame('You win!');
   }
+}
 
-  const botCenterY = bot.y + bot.h / 2;
-  if (botCenterY < botTargetY - 10) {
-    bot.y += bot.speed;
-  } else if (botCenterY > botTargetY + 10) {
-    bot.y -= bot.speed;
-  }
+function updateHpText() {
+  hpText.textContent = 'You: ' + Math.max(0, player.hp) + ' | Bot: ' + Math.max(0, bot.hp);
+}
 
-  // Clamp bot
-  const minY = 20;
-  const maxY = baseY - bot.h;
-  if (bot.y < minY) bot.y = minY;
-  if (bot.y > maxY) bot.y = maxY;
-
-  // Shooting: if roughly same vertical level and player is to the left
-  const angleToPlayer = Math.atan2(py - cy, px - cx);
-  const horizontalAngle = Math.cos(angleToPlayer);
-
-  // Only shoot when player is to the left and not too far vertically
-  if (horizontalAngle < -0.2 && Math.abs(py - cy) < 120) {
-    botShoot();
-  }
+function endGame(text) {
+  gameRunning = false;
+  resultText.textContent = text;
+  menu.style.display = 'block';
+  canvas.style.display = 'none';
+  hud.style.display = 'none';
+  pauseScreen.style.display = 'none';
 }
 
 // ----------------------
 // Draw
 // ----------------------
 
-function drawRect(x, y, w, h, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, w, h);
-}
-
-function drawCircle(x, y, r, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawCharacter(char, color) {
-  const [head, body1, body2] = getSquares(char);
-  // Slight outline
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1;
-
-  [head, body1, body2].forEach(sq => {
-    drawRect(sq.x, sq.y, sq.w, sq.h, color);
-    ctx.strokeRect(sq.x, sq.y, sq.w, sq.h);
-  });
-}
-
 function draw() {
   // Background
   ctx.fillStyle = '#050510';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Floor line
+  // Floor
   ctx.strokeStyle = '#222244';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(0, baseY);
-  ctx.lineTo(canvas.width, baseY);
+  ctx.moveTo(0, floorY);
+  ctx.lineTo(canvas.width, floorY);
   ctx.stroke();
 
-  // Characters
+  // Draw player and bot
   drawCharacter(player, player.color);
   drawCharacter(bot, bot.color);
 
-  // Bullets
+  // Draw bullets
   for (const b of bullets) {
-    drawCircle(b.x, b.y, bulletSize, b.owner === 'player' ? '#88ffff' : '#ff88aa');
-  }
-
-  // Match over overlay
-  if (matchOver) {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '24px "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(matchWinnerText, canvas.width / 2, canvas.height / 2);
+    ctx.fillStyle = b.from === 'player' ? '#88ffff' : '#ff88aa';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, bulletSize, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
-function loop() {
+function drawCharacter(char, color) {
+  const headH = char.h / 3;
+
+  // Head
+  ctx.fillStyle = color;
+  ctx.fillRect(char.x, char.y, char.w, headH);
+
+  // Body 1
+  ctx.fillRect(char.x, char.y + headH, char.w, headH);
+
+  // Body 2
+  ctx.fillRect(char.x, char.y + headH * 2, char.w, headH);
+}
+
+// ----------------------
+// Game loop
+// ----------------------
+
+function gameLoop() {
   if (!gameRunning) return;
   update();
   draw();
-  requestAnimationFrame(loop);
+  requestAnimationFrame(gameLoop);
 }

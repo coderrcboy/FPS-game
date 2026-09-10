@@ -2,36 +2,39 @@
 #day 1 of coding
 <!--<!DOCTYPE html>
 
-<!--day2 coding-->
+
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
   <title>Retro Pistol Duel</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+  <!-- Main menu -->
   <div id="menu">
     <h1>Retro Pistol Duel</h1>
-    <button id="btn-start-easy">Start (Easy Bot)</button>
-    <button id="btn-start-medium">Start (Medium Bot)</button>
-    <button id="btn-start-hard">Start (Hard Bot)</button>
-    <div id="result" style="margin-top:15px; font-size:1.2rem;"></div>
+    <button id="btn-easy">Easy</button>
+    <button id="btn-medium">Medium</button>
+    <button id="btn-hard">Hard</button>
+    <div id="result-text"></div>
   </div>
 
-  <canvas id="game" width="900" height="500" style="display:none;"></canvas>
-  <div id="hud" style="display:none; text-align:center; margin-top:8px;">
-    <span id="score"></span>
+  <!-- Game canvas -->
+  <canvas id="game" width="900" height="500"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <span id="hp-text"></span>
     <button id="btn-pause">Pause</button>
-    <button id="btn-back">Back to Menu</button>
+    <button id="btn-back">Back</button>
   </div>
 
-  <!-- Pause overlay -->
-  <div id="pause-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; color:#fff; font-family:'Courier New', monospace; flex-direction:column;">
-    <h2 style="margin-bottom:10px;">PAUSED</h2>
+  <!-- Pause screen -->
+  <div id="pause-screen">
+    <h2>PAUSED</h2>
     <button id="btn-resume">Resume</button>
-    <button id="btn-quit">Quit to Menu</button>
-    <div style="margin-top:15px; font-size:0.9rem;">Press P to pause/unpause</div>
+    <button id="btn-quit">Quit</button>
   </div>
 
   <script src="game.js"></script>

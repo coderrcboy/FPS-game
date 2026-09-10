@@ -1,0 +1,49 @@
+#ok so imma make a 2d fps game. it will have vs bot and 1v1 and pretty soon multiple players. for now i plan it to run on browser. full google gng.
+#day 1 of coding
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Retro 1v1 Game</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="menu">
+    <h1>Retro 1v1</h1>
+    <button id="btn-local-bot">1v1 vs Bot</button>
+    <button id="btn-local-friend">1v1 Local Friend</button>
+    <button id="btn-online-create">Create Online Match</button>
+    <button id="btn-online-join">Join Online Match</button>
+
+    <div id="online-create-panel" style="display:none; margin-top:10px;">
+      <p>Share this code with your friend:</p>
+      <input id="room-code-display" readonly />
+      <p>Waiting for friend to join...</p>
+    </div>
+
+    <div id="online-join-panel" style="display:none; margin-top:10px;">
+      <input id="room-code-input" placeholder="Enter room code" />
+      <button id="btn-join-confirm">Join</button>
+    </div>
+
+    <div id="difficulty-panel" style="display:none; margin-top:10px;">
+      <label>Bot difficulty:
+        <select id="bot-difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+      <button id="btn-start-bot">Start</button>
+    </div>
+  </div>
+
+  <canvas id="game" width="800" height="450" style="display:none;"></canvas>
+  <div id="hud" style="display:none; text-align:center; margin-top:5px;">
+    <span id="score"></span>
+    <button id="btn-back">Back to Menu</button>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

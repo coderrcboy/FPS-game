@@ -1,0 +1,39 @@
+#ok so imma make a 2d fps game. it will have vs bot and 1v1 and pretty soon multiple players. for now i plan it to run on browser. full google gng.
+#day 1 of coding
+<!--<!DOCTYPE html>
+
+<!--day2 coding-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Retro Pistol Duel</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="menu">
+    <h1>Retro Pistol Duel</h1>
+    <button id="btn-start-easy">Start (Easy Bot)</button>
+    <button id="btn-start-medium">Start (Medium Bot)</button>
+    <button id="btn-start-hard">Start (Hard Bot)</button>
+    <div id="result" style="margin-top:15px; font-size:1.2rem;"></div>
+  </div>
+
+  <canvas id="game" width="900" height="500" style="display:none;"></canvas>
+  <div id="hud" style="display:none; text-align:center; margin-top:8px;">
+    <span id="score"></span>
+    <button id="btn-pause">Pause</button>
+    <button id="btn-back">Back to Menu</button>
+  </div>
+
+  <!-- Pause overlay -->
+  <div id="pause-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; color:#fff; font-family:'Courier New', monospace; flex-direction:column;">
+    <h2 style="margin-bottom:10px;">PAUSED</h2>
+    <button id="btn-resume">Resume</button>
+    <button id="btn-quit">Quit to Menu</button>
+    <div style="margin-top:15px; font-size:0.9rem;">Press P to pause/unpause</div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

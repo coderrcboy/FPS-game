@@ -1,7 +1,7 @@
 body {
   margin: 0;
-  background: #0a0a14;
-  color: #e0e0ff;
+  background: #0033cc; /* Blue landing page */
+  color: #ffffff;      /* High contrast text */
   font-family: "Courier New", monospace;
   display: flex;
   flex-direction: column;
@@ -15,42 +15,52 @@ body {
 }
 
 h1 {
-  font-size: 2rem;
-  text-shadow: 2px 2px 0 #ff3366, -2px -2px 0 #33ccff;
+  font-size: 2.5rem;
+  text-shadow: 2px 2px 0 #000000;
   margin-bottom: 20px;
+  color: #ffffff;
 }
 
 button {
   margin: 6px;
-  padding: 8px 16px;
-  background: #15152a;
-  color: #33ccff;
-  border: 2px solid #33ccff;
+  padding: 10px 20px;
+  background: #001166;
+  color: #ffffff;
+  border: 2px solid #ffffff;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 1.1rem;
   cursor: pointer;
 }
 
 button:hover {
-  background: #33ccff;
-  color: #0a0a14;
+  background: #ffffff;
+  color: #001166;
 }
 
 canvas {
-  border: 4px solid #2a2a55;
+  border: 4px solid #001166;
   background: #000;
   display: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
 }
 
 #hud {
-  width: 900px;
+  width: 100%;
   display: none;
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: #111122;
-  border: 2px solid #2a2a55;
+  background: #001166;
+  border: 2px solid #ffffff;
   margin-top: 8px;
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  box-sizing: border-box;
 }
 
 #pause-screen {
@@ -62,4 +72,5 @@ canvas {
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  z-index: 10;
 }

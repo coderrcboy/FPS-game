@@ -30,9 +30,9 @@ const mouse = { x: 0, y: 0 };
 const squareSize = 30;
 const bulletSize = 6;
 const floorY = canvas.height - 60;
-const maxBounces = 3; // how many times a bullet can bounce
+const maxBounces = 3;
 
-// Map: list of rectangles {x, y, w, h}
+// Map
 const walls = [
   { x: 300, y: 200, w: 40, h: 250 },
   { x: 500, y: 100, w: 40, h: 180 },
@@ -135,7 +135,6 @@ btnQuit.addEventListener('click', function() {
 function startGame(diff) {
   difficulty = diff;
 
-  // Bot settings by difficulty
   if (difficulty === 'easy') {
     bot.speed = 3;
     bot.shootDelay = 60;
@@ -150,11 +149,9 @@ function startGame(diff) {
     bot.moveDelay = 8;
   }
 
-  // Reset HP
   player.hp = player.maxHp;
   bot.hp = bot.maxHp;
 
-  // Reset positions
   player.x = 120;
   player.y = floorY - squareSize * 3;
   bot.x = canvas.width - 120 - squareSize;
@@ -164,7 +161,6 @@ function startGame(diff) {
   playerShootWait = 0;
   bot.shootWait = 0;
 
-  // Show game
   menu.style.display = 'none';
   canvas.style.display = 'block';
   hud.style.display = 'flex';
@@ -172,6 +168,8 @@ function startGame(diff) {
 
   gameRunning = true;
   paused = false;
+
+  // Removed updateHpText() call – HP is drawn on canvas only
 
   requestAnimationFrame(gameLoop);
 }
@@ -345,7 +343,6 @@ function hasLineOfSight(x1, y1, x2, y2) {
 function update() {
   if (!gameRunning || paused) return;
 
-  // Player move
   let newPX = player.x;
   let newPY = player.y;
 
@@ -359,22 +356,18 @@ function update() {
 
   if (playerShootWait > 0) playerShootWait--;
 
-  // Bot AI
   updateBot();
 
-  // Bullets
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.x += b.vx;
     b.y += b.vy;
 
-    // Off screen
     if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
       bullets.splice(i, 1);
       continue;
     }
 
-    // Bullet hits wall? -> ricochet
     let hitWall = false;
     const bulletRect = { x: b.x - bulletSize, y: b.y - bulletSize, w: bulletSize*2, h: bulletSize*2 };
 
@@ -382,7 +375,6 @@ function update() {
       if (rectRectHit(bulletRect, w)) {
         hitWall = true;
 
-        // Decide bounce direction: check overlap on each axis
         const prevX = b.x - b.vx;
         const prevY = b.y - b.vy;
         const wasLeft  = prevX < w.x;
@@ -390,7 +382,6 @@ function update() {
         const wasAbove = prevY < w.y;
         const wasBelow = prevY > w.y + w.h;
 
-        // If mostly horizontal collision, flip vx; else flip vy
         if ((wasLeft || wasRight) && !(wasAbove || wasBelow)) {
           b.vx = -b.vx;
         } else {
@@ -409,7 +400,6 @@ function update() {
       continue;
     }
 
-    // Hit player?
     if (b.from === 'bot') {
       if (checkHitPlayer(b)) {
         bullets.splice(i, 1);
@@ -417,7 +407,6 @@ function update() {
       }
     }
 
-    // Hit bot?
     if (b.from === 'player') {
       if (checkHitBot(b)) {
         bullets.splice(i, 1);
@@ -591,11 +580,9 @@ function endGame(text) {
 // ----------------------
 
 function draw() {
-  // Background
   ctx.fillStyle = '#050510';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Walls
   ctx.fillStyle = '#555577';
   for (const w of walls) {
     ctx.fillRect(w.x, w.y, w.w, w.h);
@@ -604,7 +591,6 @@ function draw() {
     ctx.strokeRect(w.x, w.y, w.w, w.h);
   }
 
-  // Floor line
   ctx.strokeStyle = '#222244';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -612,13 +598,10 @@ function draw() {
   ctx.lineTo(canvas.width, floorY);
   ctx.stroke();
 
-  // Characters with HP bars
   drawCharacterWithHp(player, player.color);
   drawCharacterWithHp(bot, bot.color);
 
-  // Bullets
   for (const b of bullets) {
-    // Color changes slightly after bounces
     let color;
     if (b.from === 'player') {
       color = b.bounces === 0 ? '#88ffff' : '#44cccc';
@@ -639,23 +622,19 @@ function drawCharacterWithHp(char, color) {
   const barX = char.x - 10;
   const barY = char.y - 18;
 
-  // Background
   ctx.fillStyle = '#333333';
   ctx.fillRect(barX, barY, barWidth, barHeight);
 
-  // Health
   const hpPercent = char.hp / char.maxHp;
   const hpWidth = barWidth * hpPercent;
   ctx.fillStyle = '#00ff00';
   ctx.fillRect(barX, barY, hpWidth, barHeight);
 
-  // HP text
   ctx.fillStyle = '#ffffff';
   ctx.font = '12px "Courier New", monospace';
   ctx.textAlign = 'center';
   ctx.fillText(char.hp, barX + barWidth / 2, barY - 4);
 
-  // 3 squares
   const headH = char.h / 3;
 
   ctx.fillStyle = color;

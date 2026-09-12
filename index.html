@@ -1,37 +1,34 @@
-#ok so imma make a 2d fps game. it will have vs bot and 1v1 and pretty soon multiple players. for now i plan it to run on browser. full google gng.
-#day 1 of coding
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Retro Pistol Duel</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-  <!-- Main menu -->
-  <div id="menu">
+  <main id="menu">
     <h1>Retro Pistol Duel</h1>
+
     <button id="btn-easy">Easy</button>
     <button id="btn-medium">Medium</button>
     <button id="btn-hard">Hard</button>
-    <div id="result-text"></div>
-  </div>
 
-  <!-- Game canvas -->
+    <p id="result-text"></p>
+  </main>
+
   <canvas id="game" width="1200" height="700"></canvas>
 
-  <!-- HUD -->
-  <div id="hud">
+  <section id="hud">
     <button id="btn-pause">Pause</button>
     <button id="btn-back">Back</button>
-  </div>
+  </section>
 
-  <!-- Pause screen -->
-  <div id="pause-screen">
-    <h2>PAUSED</h2>
+  <section id="pause-screen">
+    <h2>Paused</h2>
     <button id="btn-resume">Resume</button>
     <button id="btn-quit">Quit</button>
-  </div>
+  </section>
 
   <script src="game.js"></script>
 </body>

@@ -1,38 +1,44 @@
-// Get elements
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
+const canvas = document.querySelector("#game");
+const ctx = canvas.getContext("2d");
 
-const menu = document.getElementById('menu');
-const hud = document.getElementById('hud');
-const pauseScreen = document.getElementById('pause-screen');
 
-const resultText = document.getElementById('result-text');
+const menu = document.querySelector("#menu");
+const hud = document.querySelector("#hud");
+const pauseScreen = document.querySelector("#pause-screen");
+const resultText = document.querySelector("#result-text");
+//choose games diff. settings
+const easyButton = document.querySelector("#btn-easy");
+const mediumButton = document.querySelector("#btn-medium");
+const hardButton = document.querySelector("#btn-hard");
+//gui inside game
+const pauseButton = document.querySelector("#btn-pause");
+const backButton = document.querySelector("#btn-back");
+const resumeButton = document.querySelector("#btn-resume");
+const quitButton = document.querySelector("#btn-quit");
 
-const btnEasy = document.getElementById('btn-easy');
-const btnMedium = document.getElementById('btn-medium');
-const btnHard = document.getElementById('btn-hard');
 
-const btnPause = document.getElementById('btn-pause');
-const btnBack = document.getElementById('btn-back');
-const btnResume = document.getElementById('btn-resume');
-const btnQuit = document.getElementById('btn-quit');
+const GAME_WIDTH = canvas.width;
+const GAME_HEIGHT = canvas.height;
+const CHARACTER_SIZE = 30;
+const BULLET_RADIUS = 6; //bullet size
+const MAX_BOUNCES = 3; //max bounces of bullet
+const PLAYER_SHOOT_DELAY = 18; //reload/recoil time ig??
+const FLOOR_Y = GAME_HEIGHT - 60;
 
-// Game state
+
 let gameRunning = false;
 let paused = false;
-let difficulty = 'medium';
+let difficulty = "medium";
+let bullets = [];
+let playerShootWait = 0;
 
-// Input
+
 const keys = {};
-const mouse = { x: 0, y: 0 };
-
-// Sizes
-const squareSize = 30;
-const bulletSize = 6;
-const floorY = canvas.height - 60;
-const maxBounces = 3;
-
-// Map
+const mouse = {
+  x: 0,
+  y: 0
+};
+//boundaries
 const walls = [
   { x: 300, y: 200, w: 40, h: 250 },
   { x: 500, y: 100, w: 40, h: 180 },
@@ -41,27 +47,26 @@ const walls = [
   { x: 900, y: 120, w: 40, h: 140 },
   { x: 900, y: 460, w: 40, h: 140 }
 ];
-
-// Player
+//colors of the player/bot and other features
 const player = {
   x: 120,
-  y: floorY - squareSize * 3,
-  w: squareSize,
-  h: squareSize * 3,
+  y: FLOOR_Y - CHARACTER_SIZE * 3,
+  w: CHARACTER_SIZE,
+  h: CHARACTER_SIZE * 3,
   speed: 6,
-  color: '#33ccff',
+  color: "#33ccff",
   hp: 200,
   maxHp: 200
 };
 
-// Bot
+
 const bot = {
-  x: canvas.width - 120 - squareSize,
-  y: floorY - squareSize * 3,
-  w: squareSize,
-  h: squareSize * 3,
+  x: GAME_WIDTH - 120 - CHARACTER_SIZE,
+  y: FLOOR_Y - CHARACTER_SIZE * 3,
+  w: CHARACTER_SIZE,
+  h: CHARACTER_SIZE * 3,
   speed: 4,
-  color: '#ff3366',
+  color: "#ff3366",
   hp: 200,
   maxHp: 200,
   shootWait: 0,
@@ -71,584 +76,828 @@ const bot = {
   targetX: 0,
   targetY: 0
 };
-
-// Bullets
-let bullets = [];
-
-// Player shoot cooldown
-let playerShootWait = 0;
-const playerShootDelay = 18;
-
-// ----------------------
-// Buttons
-// ----------------------
-
-btnEasy.addEventListener('click', function() {
-  startGame('easy');
+//some code for the game and buttons to work or smthg
+easyButton.addEventListener("click", () => {
+  startGame("easy");
 });
 
-btnMedium.addEventListener('click', function() {
-  startGame('medium');
+
+mediumButton.addEventListener("click", () => {
+  startGame("medium");
 });
 
-btnHard.addEventListener('click', function() {
-  startGame('hard');
+
+hardButton.addEventListener("click", () => {
+  startGame("hard");
 });
 
-btnBack.addEventListener('click', function() {
-  gameRunning = false;
-  menu.style.display = 'block';
-  canvas.style.display = 'none';
-  hud.style.display = 'none';
-  pauseScreen.style.display = 'none';
-  resultText.textContent = '';
-});
 
-btnPause.addEventListener('click', function() {
-  if (!gameRunning) return;
-  paused = !paused;
-  if (paused) {
-    pauseScreen.style.display = 'flex';
-  } else {
-    pauseScreen.style.display = 'none';
-  }
-});
+backButton.addEventListener("click", returnToMenu);
+quitButton.addEventListener("click", returnToMenu);
 
-btnResume.addEventListener('click', function() {
+
+pauseButton.addEventListener("click", togglePause);
+
+
+resumeButton.addEventListener("click", () => {
   paused = false;
-  pauseScreen.style.display = 'none';
+  pauseScreen.style.display = "none";
 });
 
-btnQuit.addEventListener('click', function() {
-  gameRunning = false;
-  menu.style.display = 'block';
-  canvas.style.display = 'none';
-  hud.style.display = 'none';
-  pauseScreen.style.display = 'none';
-  resultText.textContent = '';
-});
 
-// ----------------------
-// Start game
-// ----------------------
-
-function startGame(diff) {
-  difficulty = diff;
-
-  if (difficulty === 'easy') {
-    bot.speed = 3;
-    bot.shootDelay = 60;
-    bot.moveDelay = 25;
-  } else if (difficulty === 'medium') {
-    bot.speed = 4.5;
-    bot.shootDelay = 35;
-    bot.moveDelay = 15;
-  } else if (difficulty === 'hard') {
-    bot.speed = 6.5;
-    bot.shootDelay = 20;
-    bot.moveDelay = 8;
-  }
-
-  player.hp = player.maxHp;
-  bot.hp = bot.maxHp;
-
-  player.x = 120;
-  player.y = floorY - squareSize * 3;
-  bot.x = canvas.width - 120 - squareSize;
-  bot.y = floorY - squareSize * 3;
-
-  bullets = [];
-  playerShootWait = 0;
-  bot.shootWait = 0;
-
-  menu.style.display = 'none';
-  canvas.style.display = 'block';
-  hud.style.display = 'flex';
-  pauseScreen.style.display = 'none';
-
-  gameRunning = true;
-  paused = false;
-
-  // Removed updateHpText() call – HP is drawn on canvas only
-
-  requestAnimationFrame(gameLoop);
-}
-
-// ----------------------
-// Keys and mouse
-// ----------------------
-
-window.addEventListener('keydown', function(e) {
-  const key = e.key.toLowerCase();
+window.addEventListener("keydown", (event) => {
+  const key = event.key.toLowerCase();
   keys[key] = true;
 
-  if (key === 'p' && gameRunning) {
-    paused = !paused;
-    if (paused) {
-      pauseScreen.style.display = 'flex';
-    } else {
-      pauseScreen.style.display = 'none';
-    }
+
+  if (key === "p" && gameRunning) {
+    togglePause();
   }
 
-  if (key === ' ' && gameRunning && !paused) {
+
+  if (key === " " && gameRunning && !paused) {
     playerShoot();
   }
 
-  if (['arrowup','arrowdown','arrowleft','arrowright'].includes(key)) {
-    e.preventDefault();
+
+  if ([
+    "arrowup",
+    "arrowdown",
+    "arrowleft",
+    "arrowright"
+  ].includes(key)) {
+    event.preventDefault();
   }
 });
 
-window.addEventListener('keyup', function(e) {
-  keys[e.key.toLowerCase()] = false;
+
+window.addEventListener("keyup", (event) => {
+  keys[event.key.toLowerCase()] = false;
 });
 
-canvas.addEventListener('mousemove', function(e) {
-  const rect = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - rect.left;
-  mouse.y = e.clientY - rect.top;
+
+canvas.addEventListener("mousemove", (event) => {
+  const rectangle = canvas.getBoundingClientRect();
+
+
+  mouse.x = (
+    (event.clientX - rectangle.left) / rectangle.width
+  ) * GAME_WIDTH;
+
+
+  mouse.y = (
+    (event.clientY - rectangle.top) / rectangle.height
+  ) * GAME_HEIGHT;
 });
 
-canvas.addEventListener('mousedown', function() {
+
+canvas.addEventListener("mousedown", () => {
   if (gameRunning && !paused) {
     playerShoot();
   }
 });
 
-// ----------------------
-// Shooting
-// ----------------------
 
-function playerShoot() {
-  if (playerShootWait > 0) return;
+function startGame(selectedDifficulty) {
+  difficulty = selectedDifficulty;
+  setBotDifficulty();
 
-  const headH = player.h / 3;
-  const cx = player.x + player.w / 2;
-  const cy = player.y + headH / 2;
 
-  const angle = Math.atan2(mouse.y - cy, mouse.x - cx);
-  const speed = 10;
+  player.hp = player.maxHp;
+  bot.hp = bot.maxHp;
 
-  bullets.push({
-    x: cx,
-    y: cy,
-    vx: Math.cos(angle) * speed,
-    vy: Math.sin(angle) * speed,
-    from: 'player',
-    bounces: 0
-  });
 
-  playerShootWait = playerShootDelay;
+  player.x = 120;
+  player.y = FLOOR_Y - CHARACTER_SIZE * 3;
+
+
+  bot.x = GAME_WIDTH - 120 - CHARACTER_SIZE;
+  bot.y = FLOOR_Y - CHARACTER_SIZE * 3;
+
+
+  bullets = [];
+  playerShootWait = 0;
+  bot.shootWait = 0;
+  bot.moveWait = 0;
+
+
+  menu.style.display = "none";
+  canvas.style.display = "block";
+  hud.style.display = "flex";
+  pauseScreen.style.display = "none";
+
+
+  gameRunning = true;
+  paused = false;
+
+
+  requestAnimationFrame(gameLoop);
+}
+//bots settings based on diff.
+function setBotDifficulty() {
+  if (difficulty === "easy") {
+    bot.speed = 3;
+    bot.shootDelay = 60;
+    bot.moveDelay = 25;
+  }
+
+
+  if (difficulty === "medium") {
+    bot.speed = 4.5;
+    bot.shootDelay = 35;
+    bot.moveDelay = 15;
+  }
+
+
+  if (difficulty === "hard") {
+    bot.speed = 6.5;
+    bot.shootDelay = 20;
+    bot.moveDelay = 8;
+  }
 }
 
-function botShoot() {
-  if (bot.shootWait > 0) return;
 
-  const headH = bot.h / 3;
-  const cx = bot.x + bot.w / 2;
-  const cy = bot.y + headH / 2;
+function returnToMenu() {
+  gameRunning = false;
+  paused = false;
 
-  const pHeadH = player.h / 3;
-  const px = player.x + player.w / 2;
-  const py = player.y + pHeadH / 2;
 
-  const angle = Math.atan2(py - cy, px - cx);
+  menu.style.display = "block";
+  canvas.style.display = "none";
+  hud.style.display = "none";
+  pauseScreen.style.display = "none";
+  resultText.textContent = "";
+}
 
-  let error = 0.12;
-  if (difficulty === 'easy') error = 0.3;
-  if (difficulty === 'hard') error = 0.04;
 
-  const finalAngle = angle + (Math.random() - 0.5) * error;
-  const speed = 9;
+function togglePause() {
+  if (!gameRunning) {
+    return;
+  }
+
+
+  paused = !paused;
+  pauseScreen.style.display = paused ? "flex" : "none";
+}
+
+
+function playerShoot() {
+  if (playerShootWait > 0) {
+    return;
+  }
+
+
+  const headHeight = player.h / 3;
+  const startX = player.x + player.w / 2;
+  const startY = player.y + headHeight / 2;
+  const angle = Math.atan2(mouse.y - startY, mouse.x - startX);
+
 
   bullets.push({
-    x: cx,
-    y: cy,
-    vx: Math.cos(finalAngle) * speed,
-    vy: Math.sin(finalAngle) * speed,
-    from: 'bot',
+    x: startX,
+    y: startY,
+    vx: Math.cos(angle) * 10,
+    vy: Math.sin(angle) * 10,
+    from: "player",
     bounces: 0
   });
+
+
+  playerShootWait = PLAYER_SHOOT_DELAY;
+}
+
+
+function botShoot() {
+  if (bot.shootWait > 0) {
+    return;
+  }
+
+
+  const botHeadHeight = bot.h / 3;
+  const startX = bot.x + bot.w / 2;
+  const startY = bot.y + botHeadHeight / 2;
+
+
+  const playerHeadHeight = player.h / 3;
+  const targetX = player.x + player.w / 2;
+  const targetY = player.y + playerHeadHeight / 2;
+
+
+  const angle = Math.atan2(targetY - startY, targetX - startX);
+  let aimingError = 0.12;
+
+
+  if (difficulty === "easy") {
+    aimingError = 0.3;
+  }
+
+
+  if (difficulty === "hard") {
+    aimingError = 0.04;
+  }
+
+
+  const finalAngle = angle + (Math.random() - 0.5) * aimingError;
+
+
+  bullets.push({
+    x: startX,
+    y: startY,
+    vx: Math.cos(finalAngle) * 9,
+    vy: Math.sin(finalAngle) * 9,
+    from: "bot",
+    bounces: 0
+  });
+
 
   bot.shootWait = bot.shootDelay;
 }
 
-// ----------------------
-// Collision helpers
-// ----------------------
-
-function rectRectHit(a, b) {
-  return (
-    a.x < b.x + b.w &&
-    a.x + a.w > b.x &&
-    a.y < b.y + b.h &&
-    a.y + a.h > b.y
-  );
-}
-
-function rectCircleHit(rect, circle) {
-  const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.w));
-  const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.h));
-  const dx = circle.x - closestX;
-  const dy = circle.y - closestY;
-  return (dx * dx + dy * dy) <= (bulletSize * bulletSize);
-}
-
-function moveWithCollisions(char, newX, newY) {
-  const testRect = { x: newX, y: newY, w: char.w, h: char.h };
-
-  for (const w of walls) {
-    if (rectRectHit(testRect, w)) {
-      return false;
-    }
-  }
-
-  if (newX < 0 || newY < 0 ||
-      newX + char.w > canvas.width ||
-      newY + char.h > canvas.height) {
-    return false;
-  }
-
-  char.x = newX;
-  char.y = newY;
-  return true;
-}
-
-function hasLineOfSight(x1, y1, x2, y2) {
-  const steps = 20;
-  const dx = (x2 - x1) / steps;
-  const dy = (y2 - y1) / steps;
-
-  let x = x1;
-  let y = y1;
-
-  for (let i = 0; i <= steps; i++) {
-    const pointRect = { x: x - 2, y: y - 2, w: 4, h: 4 };
-    for (const w of walls) {
-      if (rectRectHit(pointRect, w)) {
-        return false;
-      }
-    }
-    x += dx;
-    y += dy;
-  }
-  return true;
-}
-
-// ----------------------
-// Update
-// ----------------------
 
 function update() {
-  if (!gameRunning || paused) return;
+  if (!gameRunning || paused) {
+    return;
+  }
 
-  let newPX = player.x;
-  let newPY = player.y;
 
-  if (keys['arrowleft'])  newPX -= player.speed;
-  if (keys['arrowright']) newPX += player.speed;
-  if (keys['arrowup'])    newPY -= player.speed;
-  if (keys['arrowdown'])  newPY += player.speed;
+  let nextPlayerX = player.x;
+  let nextPlayerY = player.y;
 
-  moveWithCollisions(player, newPX, player.y);
-  moveWithCollisions(player, player.x, newPY);
 
-  if (playerShootWait > 0) playerShootWait--;
+  if (keys.arrowleft) {
+    nextPlayerX -= player.speed;
+  }
+
+
+  if (keys.arrowright) {
+    nextPlayerX += player.speed;
+  }
+
+
+  if (keys.arrowup) {
+    nextPlayerY -= player.speed;
+  }
+
+
+  if (keys.arrowdown) {
+    nextPlayerY += player.speed;
+  }
+
+
+  moveWithCollisions(player, nextPlayerX, player.y);
+  moveWithCollisions(player, player.x, nextPlayerY);
+
+
+  if (playerShootWait > 0) {
+    playerShootWait--;
+  }
+
 
   updateBot();
+  updateBullets();
 
+
+  if (bot.shootWait > 0) {
+    bot.shootWait--;
+  }
+}
+
+
+function updateBullets() {
   for (let i = bullets.length - 1; i >= 0; i--) {
-    const b = bullets[i];
-    b.x += b.vx;
-    b.y += b.vy;
+    const bullet = bullets[i];
 
-    if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+
+    bullet.x += bullet.vx;
+    bullet.y += bullet.vy;
+
+
+    if (
+      bullet.x < 0 ||
+      bullet.x > GAME_WIDTH ||
+      bullet.y < 0 ||
+      bullet.y > GAME_HEIGHT
+    ) {
       bullets.splice(i, 1);
       continue;
     }
 
-    let hitWall = false;
-    const bulletRect = { x: b.x - bulletSize, y: b.y - bulletSize, w: bulletSize*2, h: bulletSize*2 };
 
-    for (const w of walls) {
-      if (rectRectHit(bulletRect, w)) {
-        hitWall = true;
-
-        const prevX = b.x - b.vx;
-        const prevY = b.y - b.vy;
-        const wasLeft  = prevX < w.x;
-        const wasRight = prevX > w.x + w.w;
-        const wasAbove = prevY < w.y;
-        const wasBelow = prevY > w.y + w.h;
-
-        if ((wasLeft || wasRight) && !(wasAbove || wasBelow)) {
-          b.vx = -b.vx;
-        } else {
-          b.vy = -b.vy;
-        }
-
-        b.bounces++;
-        if (b.bounces >= maxBounces) {
-          bullets.splice(i, 1);
-        }
-        break;
+    if (bounceOffWall(bullet)) {
+      if (bullet.bounces >= MAX_BOUNCES) {
+        bullets.splice(i, 1);
       }
-    }
 
-    if (hitWall) {
+
       continue;
     }
 
-    if (b.from === 'bot') {
-      if (checkHitPlayer(b)) {
-        bullets.splice(i, 1);
-        continue;
-      }
+
+    if (bullet.from === "bot" && checkHitPlayer(bullet)) {
+      bullets.splice(i, 1);
+      continue;
     }
 
-    if (b.from === 'player') {
-      if (checkHitBot(b)) {
-        bullets.splice(i, 1);
-        continue;
-      }
+
+    if (bullet.from === "player" && checkHitBot(bullet)) {
+      bullets.splice(i, 1);
     }
   }
-
-  if (bot.shootWait > 0) bot.shootWait--;
 }
 
-// ----------------------
-// Bot AI
-// ----------------------
 
 function updateBot() {
-  const botCx = bot.x + bot.w / 2;
-  const botCy = bot.y + bot.h / 2;
+  const botCenterX = bot.x + bot.w / 2;
+  const botCenterY = bot.y + bot.h / 2;
 
-  const pCx = player.x + player.w / 2;
-  const pCy = player.y + player.h / 2;
+
+  const playerCenterX = player.x + player.w / 2;
+  const playerCenterY = player.y + player.h / 2;
+
 
   if (bot.moveWait <= 0) {
-    const distX = pCx - botCx;
-    const distY = pCy - botCy;
+    const distanceX = playerCenterX - botCenterX;
+    let targetX = botCenterX;
 
-    let wantX = botCx;
-    let wantY = botCy;
 
-    if (Math.abs(distX) < 250) {
-      if (distX > 0) wantX -= 150;
-      else wantX += 150;
+    if (Math.abs(distanceX) < 250) {
+      targetX = distanceX > 0
+        ? botCenterX - 150
+        : botCenterX + 150;
     } else {
-      if (distX > 0) wantX += 120;
-      else wantX -= 120;
+      targetX = distanceX > 0
+        ? botCenterX + 120
+        : botCenterX - 120;
     }
 
-    wantY = pCy + (Math.random() - 0.5) * 80;
 
-    if (wantX < 50) wantX = 50;
-    if (wantX > canvas.width - 50) wantX = canvas.width - 50;
-    if (wantY < 50) wantY = 50;
-    if (wantY > canvas.height - 50) wantY = canvas.height - 50;
+    let targetY = playerCenterY + (Math.random() - 0.5) * 80;
 
-    bot.targetX = wantX;
-    bot.targetY = wantY;
 
+    targetX = clamp(targetX, 50, GAME_WIDTH - 50);
+    targetY = clamp(targetY, 50, GAME_HEIGHT - 50);
+
+
+    bot.targetX = targetX;
+    bot.targetY = targetY;
     bot.moveWait = bot.moveDelay;
   } else {
     bot.moveWait--;
   }
 
-  let newBX = bot.x;
-  let newBY = bot.y;
 
-  if (botCx < bot.targetX - 10) {
-    newBX += bot.speed;
-  } else if (botCx > bot.targetX + 10) {
-    newBX -= bot.speed;
+  let nextBotX = bot.x;
+  let nextBotY = bot.y;
+
+
+  if (botCenterX < bot.targetX - 10) {
+    nextBotX += bot.speed;
+  } else if (botCenterX > bot.targetX + 10) {
+    nextBotX -= bot.speed;
   }
 
-  if (botCy < bot.targetY - 10) {
-    newBY += bot.speed;
-  } else if (botCy > bot.targetY + 10) {
-    newBY -= bot.speed;
+
+  if (botCenterY < bot.targetY - 10) {
+    nextBotY += bot.speed;
+  } else if (botCenterY > bot.targetY + 10) {
+    nextBotY -= bot.speed;
   }
 
-  moveWithCollisions(bot, newBX, bot.y);
-  moveWithCollisions(bot, bot.x, newBY);
 
-  const headH = bot.h / 3;
-  const cx = bot.x + bot.w / 2;
-  const cy = bot.y + headH / 2;
+  moveWithCollisions(bot, nextBotX, bot.y);
+  moveWithCollisions(bot, bot.x, nextBotY);
 
-  const pHeadH = player.h / 3;
-  const px = player.x + player.w / 2;
-  const py = player.y + pHeadH / 2;
 
-  const dx = px - cx;
-  const dy = py - cy;
+  const botHeadHeight = bot.h / 3;
+  const startX = bot.x + bot.w / 2;
+  const startY = bot.y + botHeadHeight / 2;
 
-  const angleOk = dx < -20 && Math.abs(dy) < 140;
-  let canSee = hasLineOfSight(cx, cy, px, py);
 
-  if (difficulty === 'easy') {
-    canSee = canSee || Math.random() < 0.3;
-  } else if (difficulty === 'medium') {
-    canSee = canSee || Math.random() < 0.15;
+  const playerHeadHeight = player.h / 3;
+  const targetX = player.x + player.w / 2;
+  const targetY = player.y + playerHeadHeight / 2;
+
+
+  const horizontalDistance = targetX - startX;
+  const verticalDistance = targetY - startY;
+  const angleIsUseful = (
+    horizontalDistance < -20 &&
+    Math.abs(verticalDistance) < 140
+  );
+
+
+  let canSeePlayer = hasLineOfSight(
+    startX,
+    startY,
+    targetX,
+    targetY
+  );
+
+
+  if (difficulty === "easy" && Math.random() < 0.3) {
+    canSeePlayer = true;
   }
 
-  if (angleOk && canSee) {
+
+  if (difficulty === "medium" && Math.random() < 0.15) {
+    canSeePlayer = true;
+  }
+
+
+  if (angleIsUseful && canSeePlayer) {
     botShoot();
   }
 }
 
-// ----------------------
-// Hit checking
-// ----------------------
+
+function moveWithCollisions(character, newX, newY) {
+  const nextPosition = {
+    x: newX,
+    y: newY,
+    w: character.w,
+    h: character.h
+  };
+
+
+  for (const wall of walls) {
+    if (rectRectHit(nextPosition, wall)) {
+      return false;
+    }
+  }
+
+
+  const outsideMap = (
+    newX < 0 ||
+    newY < 0 ||
+    newX + character.w > GAME_WIDTH ||
+    newY + character.h > GAME_HEIGHT
+  );
+
+
+  if (outsideMap) {
+    return false;
+  }
+
+
+  character.x = newX;
+  character.y = newY;
+  return true;
+}
+
+
+function bounceOffWall(bullet) {
+  const bulletBox = {
+    x: bullet.x - BULLET_RADIUS,
+    y: bullet.y - BULLET_RADIUS,
+    w: BULLET_RADIUS * 2,
+    h: BULLET_RADIUS * 2
+  };
+
+
+  for (const wall of walls) {
+    if (!rectRectHit(bulletBox, wall)) {
+      continue;
+    }
+
+
+    const previousX = bullet.x - bullet.vx;
+    const previousY = bullet.y - bullet.vy;
+
+
+    const cameFromSide = (
+      previousX < wall.x ||
+      previousX > wall.x + wall.w
+    );
+
+
+    const cameFromTopOrBottom = (
+      previousY < wall.y ||
+      previousY > wall.y + wall.h
+    );
+
+
+    if (cameFromSide && !cameFromTopOrBottom) {
+      bullet.vx *= -1;
+    } else {
+      bullet.vy *= -1;
+    }
+
+
+    bullet.bounces++;
+    return true;
+  }
+
+
+  return false;
+}
+
 
 function checkHitPlayer(bullet) {
-  const headH = player.h / 3;
-
-  const head = { x: player.x, y: player.y, w: player.w, h: headH };
-  const body1 = { x: player.x, y: player.y + headH, w: player.w, h: headH };
-  const body2 = { x: player.x, y: player.y + headH * 2, w: player.w, h: headH };
-
-  if (rectCircleHit(head, bullet)) {
-    player.hp -= 25;
-    checkDeath();
-    return true;
-  }
-  if (rectCircleHit(body1, bullet)) {
-    player.hp -= 10;
-    checkDeath();
-    return true;
-  }
-  if (rectCircleHit(body2, bullet)) {
-    player.hp -= 10;
-    checkDeath();
-    return true;
-  }
-
-  return false;
+  return damageCharacter(player, bullet);
 }
+
 
 function checkHitBot(bullet) {
-  const headH = bot.h / 3;
+  return damageCharacter(bot, bullet);
+}
 
-  const head = { x: bot.x, y: bot.y, w: bot.w, h: headH };
-  const body1 = { x: bot.x, y: bot.y + headH, w: bot.w, h: headH };
-  const body2 = { x: bot.x, y: bot.y + headH * 2, w: bot.w, h: headH };
 
-  if (rectCircleHit(head, bullet)) {
-    bot.hp -= 25;
-    checkDeath();
-    return true;
+function damageCharacter(character, bullet) {
+  const sectionHeight = character.h / 3;
+
+
+  const sections = [
+    {
+      x: character.x,
+      y: character.y,
+      w: character.w,
+      h: sectionHeight,
+      damage: 25
+    },
+    {
+      x: character.x,
+      y: character.y + sectionHeight,
+      w: character.w,
+      h: sectionHeight,
+      damage: 10
+    },
+    {
+      x: character.x,
+      y: character.y + sectionHeight * 2,
+      w: character.w,
+      h: sectionHeight,
+      damage: 10
+    }
+  ];
+
+
+  for (const section of sections) {
+    if (rectCircleHit(section, bullet)) {
+      character.hp -= section.damage;
+      checkDeath();
+      return true;
+    }
   }
-  if (rectCircleHit(body1, bullet)) {
-    bot.hp -= 10;
-    checkDeath();
-    return true;
-  }
-  if (rectCircleHit(body2, bullet)) {
-    bot.hp -= 10;
-    checkDeath();
-    return true;
-  }
+
 
   return false;
 }
+
+
+function rectRectHit(first, second) {
+  return (
+    first.x < second.x + second.w &&
+    first.x + first.w > second.x &&
+    first.y < second.y + second.h &&
+    first.y + first.h > second.y
+  );
+}
+
+
+function rectCircleHit(rectangle, circle) {
+  const closestX = Math.max(
+    rectangle.x,
+    Math.min(circle.x, rectangle.x + rectangle.w)
+  );
+
+
+  const closestY = Math.max(
+    rectangle.y,
+    Math.min(circle.y, rectangle.y + rectangle.h)
+  );
+
+
+  const distanceX = circle.x - closestX;
+  const distanceY = circle.y - closestY;
+
+
+  return (
+    distanceX * distanceX +
+    distanceY * distanceY
+  ) <= BULLET_RADIUS * BULLET_RADIUS;
+}
+
+
+function hasLineOfSight(startX, startY, targetX, targetY) {
+  const steps = 20;
+  const stepX = (targetX - startX) / steps;
+  const stepY = (targetY - startY) / steps;
+
+
+  let currentX = startX;
+  let currentY = startY;
+
+
+  for (let i = 0; i <= steps; i++) {
+    const point = {
+      x: currentX - 2,
+      y: currentY - 2,
+      w: 4,
+      h: 4
+    };
+
+
+    for (const wall of walls) {
+      if (rectRectHit(point, wall)) {
+        return false;
+      }
+    }
+
+
+    currentX += stepX;
+    currentY += stepY;
+  }
+
+
+  return true;
+}
+
+
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(value, maximum));
+}
+
 
 function checkDeath() {
   if (player.hp <= 0) {
-    endGame('Bot wins!');
+    endGame("Bot wins!");
   } else if (bot.hp <= 0) {
-    endGame('You win!');
+    endGame("You win!");
   }
 }
 
-function endGame(text) {
+
+function endGame(message) {
   gameRunning = false;
-  resultText.textContent = text;
-  menu.style.display = 'block';
-  canvas.style.display = 'none';
-  hud.style.display = 'none';
-  pauseScreen.style.display = 'none';
+  resultText.textContent = message;
+
+
+  menu.style.display = "block";
+  canvas.style.display = "none";
+  hud.style.display = "none";
+  pauseScreen.style.display = "none";
 }
 
-// ----------------------
-// Draw
-// ----------------------
 
 function draw() {
-  ctx.fillStyle = '#050510';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#050510";
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-  ctx.fillStyle = '#555577';
-  for (const w of walls) {
-    ctx.fillRect(w.x, w.y, w.w, w.h);
-    ctx.strokeStyle = '#7777aa';
+
+  for (const wall of walls) {
+    ctx.fillStyle = "#555577";
+    ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+
+
+    ctx.strokeStyle = "#7777aa";
     ctx.lineWidth = 2;
-    ctx.strokeRect(w.x, w.y, w.w, w.h);
+    ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
   }
 
-  ctx.strokeStyle = '#222244';
+
+  ctx.strokeStyle = "#222244";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(0, floorY);
-  ctx.lineTo(canvas.width, floorY);
+  ctx.moveTo(0, FLOOR_Y);
+  ctx.lineTo(GAME_WIDTH, FLOOR_Y);
   ctx.stroke();
 
-  drawCharacterWithHp(player, player.color);
-  drawCharacterWithHp(bot, bot.color);
 
-  for (const b of bullets) {
-    let color;
-    if (b.from === 'player') {
-      color = b.bounces === 0 ? '#88ffff' : '#44cccc';
-    } else {
-      color = b.bounces === 0 ? '#ff88aa' : '#cc4466';
-    }
+  drawCharacter(player);
+  drawCharacter(bot);
 
-    ctx.fillStyle = color;
+
+  for (const bullet of bullets) {
+    ctx.fillStyle = bulletColor(bullet);
+
+
     ctx.beginPath();
-    ctx.arc(b.x, b.y, bulletSize, 0, Math.PI * 2);
+    ctx.arc(
+      bullet.x,
+      bullet.y,
+      BULLET_RADIUS,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
   }
+
+  // Added: draw the crosshair above all game objects.
+  drawCrosshair();
 }
 
-function drawCharacterWithHp(char, color) {
-  const barWidth = char.w + 20;
-  const barHeight = 8;
-  const barX = char.x - 10;
-  const barY = char.y - 18;
 
-  ctx.fillStyle = '#333333';
+function bulletColor(bullet) {
+  if (bullet.from === "player") {
+    return bullet.bounces === 0 ? "#88ffff" : "#44cccc";
+  }
+
+
+  return bullet.bounces === 0 ? "#ff88aa" : "#cc4466";
+}
+
+
+function drawCharacter(character) {
+  const barWidth = character.w + 20;
+  const barHeight = 8;
+  const barX = character.x - 10;
+  const barY = character.y - 18;
+  const healthPercent = Math.max(
+    0,
+    character.hp / character.maxHp
+  );
+
+
+  ctx.fillStyle = "#333333";
   ctx.fillRect(barX, barY, barWidth, barHeight);
 
-  const hpPercent = char.hp / char.maxHp;
-  const hpWidth = barWidth * hpPercent;
-  ctx.fillStyle = '#00ff00';
-  ctx.fillRect(barX, barY, hpWidth, barHeight);
 
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = "#00ff00";
+  ctx.fillRect(
+    barX,
+    barY,
+    barWidth * healthPercent,
+    barHeight
+  );
+
+
+  ctx.fillStyle = "white";
   ctx.font = '12px "Courier New", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(char.hp, barX + barWidth / 2, barY - 4);
+  ctx.textAlign = "center";
+  ctx.fillText(
+    character.hp,
+    barX + barWidth / 2,
+    barY - 4
+  );
 
-  const headH = char.h / 3;
 
-  ctx.fillStyle = color;
-  ctx.fillRect(char.x, char.y, char.w, headH);
-  ctx.fillRect(char.x, char.y + headH, char.w, headH);
-  ctx.fillRect(char.x, char.y + headH * 2, char.w, headH);
+  const sectionHeight = character.h / 3;
+
+
+  ctx.fillStyle = character.color;
+  ctx.fillRect(
+    character.x,
+    character.y,
+    character.w,
+    sectionHeight
+  );
+
+
+  ctx.fillRect(
+    character.x,
+    character.y + sectionHeight,
+    character.w,
+    sectionHeight
+  );
+
+
+  ctx.fillRect(
+    character.x,
+    character.y + sectionHeight * 2,
+    character.w,
+    sectionHeight
+  );
 }
 
-// ----------------------
-// Game loop
-// ----------------------
+
+// Added: draw a plus-shaped crosshair at the mouse position.
+function drawCrosshair() {
+  const size = 10;
+  const gap = 4;
+
+  ctx.save();
+
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "square";
+
+  ctx.beginPath();
+
+  // Horizontal parts of the plus sign.
+  ctx.moveTo(mouse.x - size, mouse.y);
+  ctx.lineTo(mouse.x - gap, mouse.y);
+
+  ctx.moveTo(mouse.x + gap, mouse.y);
+  ctx.lineTo(mouse.x + size, mouse.y);
+
+  // Vertical parts of the plus sign.
+  ctx.moveTo(mouse.x, mouse.y - size);
+  ctx.lineTo(mouse.x, mouse.y - gap);
+
+  ctx.moveTo(mouse.x, mouse.y + gap);
+  ctx.lineTo(mouse.x, mouse.y + size);
+
+  ctx.stroke();
+  ctx.restore();
+}
+
 
 function gameLoop() {
-  if (!gameRunning) return;
+  if (!gameRunning) {
+    return;
+  }
+
+
   update();
   draw();
   requestAnimationFrame(gameLoop);

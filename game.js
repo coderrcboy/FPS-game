@@ -16,14 +16,60 @@ const backButton = document.querySelector("#btn-back");
 const resumeButton = document.querySelector("#btn-resume");
 const quitButton = document.querySelector("#btn-quit");
 
+// Mode toggle elements
+const radioBot = document.querySelector("#radio-bot");
+const radio2p = document.querySelector("#radio-2p");
+const diffSection = document.querySelector("#diff-section");
+const p2Section = document.querySelector("#p2-section");
+const start2pButton = document.querySelector("#btn-start-2p");
+
+// Settings elements
+const volumeSlider = document.querySelector("#volume-slider");
+const eraSlider = document.querySelector("#era-slider");
+
+// Preloading Theme Assets with error/load handlers
+const images = {
+  cavemanAvatar: { img: new Image(), loaded: false },
+  cavemanBg: { img: new Image(), loaded: false },
+  shipAvatar: { img: new Image(), loaded: false },
+  spaceBg: { img: new Image(), loaded: false }
+};
+
+images.cavemanAvatar.img.onload = () => { images.cavemanAvatar.loaded = true; };
+images.cavemanAvatar.img.src = "caveman.png";
+
+images.cavemanBg.img.onload = () => { images.cavemanBg.loaded = true; };
+images.cavemanBg.img.src = "cavemanera.jpeg";
+
+images.shipAvatar.img.onload = () => { images.shipAvatar.loaded = true; };
+images.shipAvatar.img.src = "ship.png";
+
+images.spaceBg.img.onload = () => { images.spaceBg.loaded = true; };
+images.spaceBg.img.src = "space.jpeg";
+
+radioBot.addEventListener("change", () => {
+  diffSection.style.display = "block";
+  p2Section.style.display = "none";
+});
+
+radio2p.addEventListener("change", () => {
+  diffSection.style.display = "none";
+  p2Section.style.display = "block";
+});
+
+start2pButton.addEventListener("click", () => {
+  startGame("medium");
+});
+
 
 const GAME_WIDTH = canvas.width;
 const GAME_HEIGHT = canvas.height;
+const BORDER_PADDING = 6; // Accounts for outer arena border stroke
 const CHARACTER_SIZE = 30;
 const BULLET_RADIUS = 6; //bullet size
 const MAX_BOUNCES = 3; //max bounces of bullet
 const PLAYER_SHOOT_DELAY = 18; //reload/recoil time ig??
-const FLOOR_Y = GAME_HEIGHT - 60;
+const FLOOR_Y = GAME_HEIGHT - 60; // Strict boundary stopping entities above HUD
 
 
 let gameRunning = false;
@@ -31,6 +77,15 @@ let paused = false;
 let difficulty = "medium";
 let bullets = [];
 let playerShootWait = 0;
+let isTwoPlayer = false;
+
+// Audio setup
+const shootSound = new Audio("gun.mp3");
+function playShootSound() {
+  shootSound.currentTime = 0;
+  shootSound.volume = parseFloat(volumeSlider.value);
+  shootSound.play().catch(() => {});
+}
 
 
 const keys = {};
@@ -39,14 +94,64 @@ const mouse = {
   y: 0
 };
 //boundaries
-const walls = [
-  { x: 300, y: 200, w: 40, h: 250 },
-  { x: 500, y: 100, w: 40, h: 180 },
-  { x: 500, y: 420, w: 40, h: 180 },
-  { x: 750, y: 250, w: 40, h: 250 },
-  { x: 900, y: 120, w: 40, h: 140 },
-  { x: 900, y: 460, w: 40, h: 140 }
+let walls = [];
+
+const OBSTACLE_COLORS = [
+  "#555577", "#8844aa", "#228899", "#aa5533",
+  "#448855", "#aa3366", "#777733", "#3355aa"
 ];
+
+function generateRandomWalls() {
+  walls = [];
+  const targetWallCount = Math.floor(Math.random() * 12) + 4; // 4 to 15 obstacles
+
+  const playerSpawn = { x: 40, y: 40, w: 220, h: FLOOR_Y - 80 };
+  const botSpawn = { x: GAME_WIDTH - 260, y: 40, w: 220, h: FLOOR_Y - 80 };
+
+  let attempts = 0;
+  while (walls.length < targetWallCount && attempts < 200) {
+    attempts++;
+
+    const width = Math.floor(Math.random() * 60) + 25;
+    const height = Math.floor(Math.random() * 120) + 50;
+    
+    const x = Math.floor(Math.random() * (GAME_WIDTH - 500)) + 250;
+    const y = Math.floor(Math.random() * (FLOOR_Y - height - 40)) + 20;
+
+    const candidateWall = {
+      x: x,
+      y: y,
+      w: width,
+      h: height,
+      color: OBSTACLE_COLORS[Math.floor(Math.random() * OBSTACLE_COLORS.length)]
+    };
+
+    // Check overlaps with player/bot spawns
+    if (rectRectHit(candidateWall, playerSpawn) || rectRectHit(candidateWall, botSpawn)) {
+      continue;
+    }
+
+    // Check non-overlapping against existing generated walls with margin
+    let overlapsExisting = false;
+    for (const wall of walls) {
+      const paddedWall = {
+        x: wall.x - 10,
+        y: wall.y - 10,
+        w: wall.w + 20,
+        h: wall.h + 20
+      };
+      if (rectRectHit(candidateWall, paddedWall)) {
+        overlapsExisting = true;
+        break;
+      }
+    }
+
+    if (!overlapsExisting) {
+      walls.push(candidateWall);
+    }
+  }
+}
+
 //colors of the player/bot and other features
 const player = {
   x: 120,
@@ -65,16 +170,18 @@ const bot = {
   y: FLOOR_Y - CHARACTER_SIZE * 3,
   w: CHARACTER_SIZE,
   h: CHARACTER_SIZE * 3,
-  speed: 4,
+  speed: 4.5,
   color: "#ff3366",
   hp: 200,
   maxHp: 200,
   shootWait: 0,
-  shootDelay: 40,
+  shootDelay: 35,
   moveWait: 0,
   moveDelay: 15,
   targetX: 0,
-  targetY: 0
+  targetY: 0,
+  vx: 0,
+  vy: 0
 };
 //some code for the game and buttons to work or smthg
 easyButton.addEventListener("click", () => {
@@ -119,12 +226,17 @@ window.addEventListener("keydown", (event) => {
     playerShoot();
   }
 
+  if ((key === "enter" || key === "shift") && gameRunning && !paused && isTwoPlayer) {
+    player2Shoot();
+  }
+
 
   if ([
     "arrowup",
     "arrowdown",
     "arrowleft",
-    "arrowright"
+    "arrowright",
+    "w", "a", "s", "d"
   ].includes(key)) {
     event.preventDefault();
   }
@@ -159,8 +271,11 @@ canvas.addEventListener("mousedown", () => {
 
 
 function startGame(selectedDifficulty) {
+  isTwoPlayer = radio2p.checked;
+
   difficulty = selectedDifficulty;
   setBotDifficulty();
+  generateRandomWalls();
 
 
   player.hp = player.maxHp;
@@ -173,6 +288,8 @@ function startGame(selectedDifficulty) {
 
   bot.x = GAME_WIDTH - 120 - CHARACTER_SIZE;
   bot.y = FLOOR_Y - CHARACTER_SIZE * 3;
+  bot.targetX = bot.x;
+  bot.targetY = bot.y;
 
 
   bullets = [];
@@ -196,23 +313,23 @@ function startGame(selectedDifficulty) {
 //bots settings based on diff.
 function setBotDifficulty() {
   if (difficulty === "easy") {
-    bot.speed = 3;
-    bot.shootDelay = 60;
-    bot.moveDelay = 25;
+    bot.speed = 3.5;
+    bot.shootDelay = 55;
+    bot.moveDelay = 20;
   }
 
 
   if (difficulty === "medium") {
-    bot.speed = 4.5;
-    bot.shootDelay = 35;
-    bot.moveDelay = 15;
+    bot.speed = 5.0;
+    bot.shootDelay = 30;
+    bot.moveDelay = 12;
   }
 
 
   if (difficulty === "hard") {
     bot.speed = 6.5;
-    bot.shootDelay = 20;
-    bot.moveDelay = 8;
+    bot.shootDelay = 18;
+    bot.moveDelay = 6;
   }
 }
 
@@ -262,8 +379,33 @@ function playerShoot() {
     bounces: 0
   });
 
-
+  playShootSound();
   playerShootWait = PLAYER_SHOOT_DELAY;
+}
+
+function player2Shoot() {
+  if (bot.shootWait > 0) {
+    return;
+  }
+
+  const startX = bot.x + bot.w / 2;
+  const startY = bot.y + (bot.h / 6);
+  const targetX = player.x + player.w / 2;
+  const targetY = player.y + (player.h / 6);
+
+  const angle = Math.atan2(targetY - startY, targetX - startX);
+
+  bullets.push({
+    x: startX,
+    y: startY,
+    vx: Math.cos(angle) * 10,
+    vy: Math.sin(angle) * 10,
+    from: "bot",
+    bounces: 0
+  });
+
+  playShootSound();
+  bot.shootWait = PLAYER_SHOOT_DELAY;
 }
 
 
@@ -277,25 +419,12 @@ function botShoot() {
   const startX = bot.x + bot.w / 2;
   const startY = bot.y + botHeadHeight / 2;
 
-
-  const playerHeadHeight = player.h / 3;
+  // Predictive leading algorithm
   const targetX = player.x + player.w / 2;
-  const targetY = player.y + playerHeadHeight / 2;
-
+  const targetY = player.y + (player.h / 3) / 2;
 
   const angle = Math.atan2(targetY - startY, targetX - startX);
-  let aimingError = 0.12;
-
-
-  if (difficulty === "easy") {
-    aimingError = 0.3;
-  }
-
-
-  if (difficulty === "hard") {
-    aimingError = 0.04;
-  }
-
+  let aimingError = difficulty === "easy" ? 0.25 : (difficulty === "medium" ? 0.10 : 0.02);
 
   const finalAngle = angle + (Math.random() - 0.5) * aimingError;
 
@@ -303,13 +432,13 @@ function botShoot() {
   bullets.push({
     x: startX,
     y: startY,
-    vx: Math.cos(finalAngle) * 9,
-    vy: Math.sin(finalAngle) * 9,
+    vx: Math.cos(finalAngle) * 9.5,
+    vy: Math.sin(finalAngle) * 9.5,
     from: "bot",
     bounces: 0
   });
 
-
+  playShootSound();
   bot.shootWait = bot.shootDelay;
 }
 
@@ -324,22 +453,22 @@ function update() {
   let nextPlayerY = player.y;
 
 
-  if (keys.arrowleft) {
+  if (keys.a || (!isTwoPlayer && keys.arrowleft)) {
     nextPlayerX -= player.speed;
   }
 
 
-  if (keys.arrowright) {
+  if (keys.d || (!isTwoPlayer && keys.arrowright)) {
     nextPlayerX += player.speed;
   }
 
 
-  if (keys.arrowup) {
+  if (keys.w || (!isTwoPlayer && keys.arrowup)) {
     nextPlayerY -= player.speed;
   }
 
 
-  if (keys.arrowdown) {
+  if (keys.s || (!isTwoPlayer && keys.arrowdown)) {
     nextPlayerY += player.speed;
   }
 
@@ -353,13 +482,31 @@ function update() {
   }
 
 
-  updateBot();
+  if (isTwoPlayer) {
+    updatePlayer2();
+  } else {
+    updateBot();
+  }
+
   updateBullets();
 
 
   if (bot.shootWait > 0) {
     bot.shootWait--;
   }
+}
+
+function updatePlayer2() {
+  let nextBotX = bot.x;
+  let nextBotY = bot.y;
+
+  if (keys.arrowleft) nextBotX -= bot.speed;
+  if (keys.arrowright) nextBotX += bot.speed;
+  if (keys.arrowup) nextBotY -= bot.speed;
+  if (keys.arrowdown) nextBotY += bot.speed;
+
+  moveWithCollisions(bot, nextBotX, bot.y);
+  moveWithCollisions(bot, bot.x, nextBotY);
 }
 
 
@@ -373,10 +520,10 @@ function updateBullets() {
 
 
     if (
-      bullet.x < 0 ||
-      bullet.x > GAME_WIDTH ||
-      bullet.y < 0 ||
-      bullet.y > GAME_HEIGHT
+      bullet.x < BORDER_PADDING ||
+      bullet.x > GAME_WIDTH - BORDER_PADDING ||
+      bullet.y < BORDER_PADDING ||
+      bullet.y > FLOOR_Y
     ) {
       bullets.splice(i, 1);
       continue;
@@ -414,103 +561,68 @@ function updateBot() {
   const playerCenterX = player.x + player.w / 2;
   const playerCenterY = player.y + player.h / 2;
 
-
+  // Reposition logic
   if (bot.moveWait <= 0) {
-    const distanceX = playerCenterX - botCenterX;
+    const dist = Math.hypot(playerCenterX - botCenterX, playerCenterY - botCenterY);
+    
     let targetX = botCenterX;
+    let targetY = playerCenterY + (Math.random() - 0.5) * 100;
 
-
-    if (Math.abs(distanceX) < 250) {
-      targetX = distanceX > 0
-        ? botCenterX - 150
-        : botCenterX + 150;
+    if (dist < 220) {
+      targetX = botCenterX + (botCenterX > playerCenterX ? 120 : -120);
     } else {
-      targetX = distanceX > 0
-        ? botCenterX + 120
-        : botCenterX - 120;
+      targetX = botCenterX + (Math.random() - 0.5) * 200;
     }
 
-
-    let targetY = playerCenterY + (Math.random() - 0.5) * 80;
-
-
-    targetX = clamp(targetX, 50, GAME_WIDTH - 50);
-    targetY = clamp(targetY, 50, GAME_HEIGHT - 50);
-
-
-    bot.targetX = targetX;
-    bot.targetY = targetY;
+    bot.targetX = clamp(targetX, BORDER_PADDING, GAME_WIDTH - bot.w - BORDER_PADDING);
+    bot.targetY = clamp(targetY, BORDER_PADDING, FLOOR_Y - bot.h);
     bot.moveWait = bot.moveDelay;
   } else {
     bot.moveWait--;
   }
 
+  // Smooth movement calculations
+  let dx = bot.targetX - bot.x;
+  let dy = bot.targetY - bot.y;
+  let distance = Math.hypot(dx, dy);
 
-  let nextBotX = bot.x;
-  let nextBotY = bot.y;
+  if (distance > 5) {
+    let stepX = (dx / distance) * bot.speed;
+    let stepY = (dy / distance) * bot.speed;
 
-
-  if (botCenterX < bot.targetX - 10) {
-    nextBotX += bot.speed;
-  } else if (botCenterX > bot.targetX + 10) {
-    nextBotX -= bot.speed;
+    if (!moveWithCollisions(bot, bot.x + stepX, bot.y)) {
+      bot.targetX = bot.x;
+    }
+    if (!moveWithCollisions(bot, bot.x, bot.y + stepY)) {
+      bot.targetY = bot.y;
+    }
   }
 
-
-  if (botCenterY < bot.targetY - 10) {
-    nextBotY += bot.speed;
-  } else if (botCenterY > bot.targetY + 10) {
-    nextBotY -= bot.speed;
-  }
-
-
-  moveWithCollisions(bot, nextBotX, bot.y);
-  moveWithCollisions(bot, bot.x, nextBotY);
-
-
-  const botHeadHeight = bot.h / 3;
+  // Bot shooting line-of-sight check
   const startX = bot.x + bot.w / 2;
-  const startY = bot.y + botHeadHeight / 2;
-
-
-  const playerHeadHeight = player.h / 3;
+  const startY = bot.y + (bot.h / 6);
   const targetX = player.x + player.w / 2;
-  const targetY = player.y + playerHeadHeight / 2;
+  const targetY = player.y + (player.h / 6);
 
+  let canSeePlayer = hasLineOfSight(startX, startY, targetX, targetY);
 
-  const horizontalDistance = targetX - startX;
-  const verticalDistance = targetY - startY;
-  const angleIsUseful = (
-    horizontalDistance < -20 &&
-    Math.abs(verticalDistance) < 140
-  );
-
-
-  let canSeePlayer = hasLineOfSight(
-    startX,
-    startY,
-    targetX,
-    targetY
-  );
-
-
-  if (difficulty === "easy" && Math.random() < 0.3) {
-    canSeePlayer = true;
-  }
-
-
-  if (difficulty === "medium" && Math.random() < 0.15) {
-    canSeePlayer = true;
-  }
-
-
-  if (angleIsUseful && canSeePlayer) {
+  if (canSeePlayer || Math.random() < 0.05) {
     botShoot();
   }
 }
 
 
 function moveWithCollisions(character, newX, newY) {
+  // Strict border clamping (Character never crosses bottom FLOOR_Y)
+  const minX = BORDER_PADDING;
+  const maxX = GAME_WIDTH - character.w - BORDER_PADDING;
+  const minY = BORDER_PADDING;
+  const maxY = FLOOR_Y - character.h;
+
+  if (newX < minX || newX > maxX || newY < minY || newY > maxY) {
+    return false;
+  }
+
   const nextPosition = {
     x: newX,
     y: newY,
@@ -518,26 +630,12 @@ function moveWithCollisions(character, newX, newY) {
     h: character.h
   };
 
-
+  // Wall collisions
   for (const wall of walls) {
     if (rectRectHit(nextPosition, wall)) {
       return false;
     }
   }
-
-
-  const outsideMap = (
-    newX < 0 ||
-    newY < 0 ||
-    newX + character.w > GAME_WIDTH ||
-    newY + character.h > GAME_HEIGHT
-  );
-
-
-  if (outsideMap) {
-    return false;
-  }
-
 
   character.x = newX;
   character.y = newY;
@@ -720,9 +818,9 @@ function clamp(value, minimum, maximum) {
 
 function checkDeath() {
   if (player.hp <= 0) {
-    endGame("Bot wins!");
+    endGame(isTwoPlayer ? "Player 2 Wins!" : "Bot wins!");
   } else if (bot.hp <= 0) {
-    endGame("You win!");
+    endGame(isTwoPlayer ? "Player 1 Wins!" : "You win!");
   }
 }
 
@@ -740,16 +838,40 @@ function endGame(message) {
 
 
 function draw() {
-  ctx.fillStyle = "#050510";
-  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  const eraVal = parseInt(eraSlider.value);
+
+  // Background Rendering with Fallback Themes
+  if (eraVal === 1) {
+    if (images.cavemanBg.loaded) {
+      ctx.drawImage(images.cavemanBg.img, 0, 0, GAME_WIDTH, GAME_HEIGHT);
+    } else {
+      ctx.fillStyle = "#3b2505";
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    }
+  } else if (eraVal === 2) {
+    if (images.spaceBg.loaded) {
+      ctx.drawImage(images.spaceBg.img, 0, 0, GAME_WIDTH, GAME_HEIGHT);
+    } else {
+      ctx.fillStyle = "#00051a";
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    }
+  } else {
+    ctx.fillStyle = "#050510";
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  }
+
+  // Outer Map Arena Borders
+  ctx.strokeStyle = "#00ffff";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(3, 3, GAME_WIDTH - 6, GAME_HEIGHT - 6);
 
 
   for (const wall of walls) {
-    ctx.fillStyle = "#555577";
+    ctx.fillStyle = wall.color || "#555577";
     ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
 
 
-    ctx.strokeStyle = "#7777aa";
+    ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 2;
     ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
   }
@@ -830,33 +952,41 @@ function drawCharacter(character) {
     barY - 4
   );
 
+  const eraVal = parseInt(eraSlider.value);
 
-  const sectionHeight = character.h / 3;
+  // Era Avatar Rendering with Graphic Fallbacks
+  if (eraVal === 1) {
+    if (images.cavemanAvatar.loaded) {
+      ctx.drawImage(images.cavemanAvatar.img, character.x, character.y, character.w, character.h);
+    } else {
+      // Caveman Fallback Avatar (Stone / Wood style)
+      ctx.fillStyle = "#8b5a2b";
+      ctx.fillRect(character.x, character.y, character.w, character.h);
+      ctx.fillStyle = "#ffcc99";
+      ctx.fillRect(character.x + 5, character.y + 5, character.w - 10, 20);
+    }
+  } else if (eraVal === 2) {
+    if (images.shipAvatar.loaded) {
+      ctx.drawImage(images.shipAvatar.img, character.x, character.y, character.w, character.h);
+    } else {
+      // Futuristic Fallback Avatar (Sci-Fi Cyber ship)
+      ctx.fillStyle = "#00ffcc";
+      ctx.beginPath();
+      ctx.moveTo(character.x + character.w / 2, character.y);
+      ctx.lineTo(character.x + character.w, character.y + character.h);
+      ctx.lineTo(character.x, character.y + character.h);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    // Standard Retro 3-block avatar
+    const sectionHeight = character.h / 3;
 
-
-  ctx.fillStyle = character.color;
-  ctx.fillRect(
-    character.x,
-    character.y,
-    character.w,
-    sectionHeight
-  );
-
-
-  ctx.fillRect(
-    character.x,
-    character.y + sectionHeight,
-    character.w,
-    sectionHeight
-  );
-
-
-  ctx.fillRect(
-    character.x,
-    character.y + sectionHeight * 2,
-    character.w,
-    sectionHeight
-  );
+    ctx.fillStyle = character.color;
+    ctx.fillRect(character.x, character.y, character.w, sectionHeight);
+    ctx.fillRect(character.x, character.y + sectionHeight, character.w, sectionHeight);
+    ctx.fillRect(character.x, character.y + sectionHeight * 2, character.w, sectionHeight);
+  }
 }
 
 

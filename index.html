@@ -2,13 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Retro Pistol Duel</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main id="menu">
     <h1>Retro Pistol Duel</h1>
+
+    <!-- Player Login Section -->
+    <div class="login-box">
+      <label for="username-input">Player Profile: </label>
+      <input type="text" id="username-input" placeholder="Enter Username" value="Player1">
+      <button id="btn-login">Save / Load Profile</button>
+      <p id="profile-status">Logged in as: <b>Player1</b></p>
+    </div>
 
     <div class="mode-select">
       <label>
@@ -32,7 +40,7 @@
     </div>
 
     <div class="settings-box">
-      <h3>Settings</h3>
+      <h3>Settings & Shop</h3>
       <div class="setting-item">
         <label for="volume-slider">Volume: </label>
         <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
@@ -49,12 +57,28 @@
           </div>
         </div>
       </div>
+
+      <div class="shop-section">
+        <h4>Skins Shop (Bank: <span id="bank-coins">0</span> Coins)</h4>
+        <div class="shop-items">
+          <button id="buy-bird">Bird Skin (10 Coins)</button>
+          <button id="buy-star">Star Skin (20 Coins)</button>
+          <button id="buy-nuke">Nuke Skin (35 Coins)</button>
+        </div>
+        <div class="setting-item">
+          <label for="skin-select">Equipped Head Skin: </label>
+          <select id="skin-select">
+            <option value="none">Default Block</option>
+          </select>
+        </div>
+      </div>
     </div>
 
     <div class="rules-box">
       <h3>How to Play</h3>
-      <p><b>P1:</b> WASD / Arrows to Move | Mouse to Aim & Click to Shoot (or Space)</p>
+      <p><b>P1:</b> WASD / Arrows / Touch to Move | Aim & Click to Shoot (or Space)</p>
       <p><b>P2 (2 Player Mode):</b> Arrow Keys to Move | Enter or Right-Shift to Shoot</p>
+      <p><b>Coins:</b> 5 coins spawn each match (1 at enemy spawn, 2 near enemy fire, 2 random). Collect them to spend in the Shop!</p>
       <p>Bullets ricochet off walls! Headshots deal extra damage.</p>
     </div>
 
@@ -64,14 +88,40 @@
   <canvas id="game" width="1200" height="700"></canvas>
 
   <section id="hud">
-    <button id="btn-pause">Pause</button>
-    <button id="btn-back">Back</button>
+    <div class="score-display">
+      <span>Coins: <span id="coin-count">0</span>/5</span>
+    </div>
+    <div>
+      <button id="btn-pause">Pause</button>
+      <button id="btn-back">Back</button>
+    </div>
   </section>
+
+  <!-- Touch Controls for Mobile Compatibility -->
+  <div id="touch-controls">
+    <div id="dpad">
+      <button id="touch-up">▲</button>
+      <div class="dpad-row">
+        <button id="touch-left">◄</button>
+        <button id="touch-down">▼</button>
+        <button id="touch-right">►</button>
+      </div>
+    </div>
+    <button id="touch-fire">FIRE</button>
+  </div>
 
   <section id="pause-screen">
     <h2>Paused</h2>
     <button id="btn-resume">Resume</button>
     <button id="btn-quit">Quit</button>
+  </section>
+
+  <section id="game-over-screen">
+    <h2 id="game-over-title">Game Over</h2>
+    <p id="game-over-msg"></p>
+    <p id="game-over-coins"></p>
+    <button id="btn-restart">Play Again</button>
+    <button id="btn-gameover-menu">Main Menu</button>
   </section>
 
   <script src="game.js"></script>

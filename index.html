@@ -77,7 +77,7 @@
       <p><b>Coins:</b> Collect coins to unlock skins in the shop!</p>
     </div>
 
-    <!-- Small Main Menu Visit Counter -->
+    <!-- Main Menu Visit Counter -->
     <div class="visitor-counter">
       <span id="visit-count">1</span>
       <span class="visitor-label">Visits</span>
@@ -115,8 +115,15 @@
     <button id="btn-gameover-menu">Main Menu</button>
   </section>
 
-  <!-- Three.js CDN Import -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- High-reliability Three.js CDN with fallbacks -->
+  <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- Local Game Script (Must be lowercase game.js in GitHub) -->
   <script src="game.js"></script>
 </body>
 </html>

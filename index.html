@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Retro Pistol Duel</title>
+  <title>Retro Pistol Duel 3D</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main id="menu">
-    <h1>Retro Pistol Duel</h1>
+    <h1>Retro Pistol Duel 3D</h1>
 
-    <!-- Player Login Section -->
     <div class="login-box">
       <label for="username-input">Player Profile: </label>
       <input type="text" id="username-input" placeholder="Enter Username" value="Player1">
@@ -19,12 +18,8 @@
     </div>
 
     <div class="mode-select">
-      <label>
-        <input type="radio" name="game-mode" value="bot" id="radio-bot" checked> Vs Bot
-      </label>
-      <label>
-        <input type="radio" name="game-mode" value="2player" id="radio-2p"> 2 Player (Local)
-      </label>
+      <label><input type="radio" name="game-mode" value="bot" id="radio-bot" checked> Vs Bot</label>
+      <label><input type="radio" name="game-mode" value="2player" id="radio-2p"> 2 Player (Local)</label>
     </div>
 
     <br>
@@ -33,6 +28,7 @@
       <button id="btn-easy">Easy</button>
       <button id="btn-medium">Medium</button>
       <button id="btn-hard">Hard</button>
+      <button id="btn-tutorial">Replay Tutorial</button>
     </div>
 
     <div id="p2-section" style="display: none;">
@@ -43,7 +39,7 @@
       <h3>Settings & Shop</h3>
       <div class="setting-item">
         <label for="volume-slider">Volume: </label>
-        <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5">
+        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.2">
       </div>
 
       <div class="setting-item">
@@ -76,39 +72,34 @@
 
     <div class="rules-box">
       <h3>How to Play</h3>
-      <p><b>P1:</b> WASD / Arrows / Touch to Move | Aim & Click to Shoot (or Space)</p>
-      <p><b>P2 (2 Player Mode):</b> Arrow Keys to Move | Enter or Right-Shift to Shoot</p>
-      <p><b>Coins:</b> 5 coins spawn each match (1 at enemy spawn, 2 near enemy fire, 2 random). Collect them to spend in the Shop!</p>
-      <p>Bullets ricochet off walls! Headshots deal extra damage.</p>
+      <p><b>P1:</b> WASD to Move | Mouse to Aim | Scroll Wheel to Zoom/Orbit | Click to Shoot</p>
+      <p><b>P2:</b> Arrow Keys to Move | Enter/Shift to Shoot</p>
+      <p><b>Coins:</b> Collect coins to unlock skins in the shop!</p>
     </div>
 
-    <p id="result-text"></p>
+    <!-- Small Main Menu Visit Counter -->
+    <div class="visitor-counter">
+      <span id="visit-count">1</span>
+      <span class="visitor-label">Visits</span>
+    </div>
   </main>
 
-  <canvas id="game" width="1200" height="700"></canvas>
+  <div id="gate-container">
+    <div class="gate-door gate-left"></div>
+    <div class="gate-door gate-right"></div>
+  </div>
+
+  <div id="webgl-container"></div>
+  <button id="btn-skip-tutorial">Skip Tutorial ➔</button>
 
   <section id="hud">
-    <div class="score-display">
-      <span>Coins: <span id="coin-count">0</span>/5</span>
-    </div>
+    <div class="score-display">Coins: <span id="coin-count">0</span>/5</div>
+    <div id="tutorial-banner"></div>
     <div>
       <button id="btn-pause">Pause</button>
       <button id="btn-back">Back</button>
     </div>
   </section>
-
-  <!-- Touch Controls for Mobile Compatibility -->
-  <div id="touch-controls">
-    <div id="dpad">
-      <button id="touch-up">▲</button>
-      <div class="dpad-row">
-        <button id="touch-left">◄</button>
-        <button id="touch-down">▼</button>
-        <button id="touch-right">►</button>
-      </div>
-    </div>
-    <button id="touch-fire">FIRE</button>
-  </div>
 
   <section id="pause-screen">
     <h2>Paused</h2>
@@ -124,6 +115,8 @@
     <button id="btn-gameover-menu">Main Menu</button>
   </section>
 
+  <!-- Three.js CDN Import -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
